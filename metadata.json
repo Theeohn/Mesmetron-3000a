@@ -1,0 +1,15 @@
+{
+  "id": "MESMETRON",
+  "name": "Mesmetron",
+  "author": "@Theeohn",
+  "version": "1.0.0",
+  "description": "Screensavers of all kinds, rendered locally, no videos.",
+  "icon": "HYPNO.png",
+  "previews": [],
+  "type": "app",
+  "readme": "README.md",
+  "storage": [
+    { "name": "HOLO/MESMETRON/app.js", "url": "app.min.js" }
+  ],
+  "storageOptional": []
+}
