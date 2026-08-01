@@ -1,0 +1,8 @@
+{
+  "id": "MESMETRON	",
+  "name": "Mesmetron",
+  "version": "1.0.0",
+  "files": "HOLO/MESMETRON/APP.JS",
+  "src": "HOLO/MESMETRON/APP.JS",
+  "icon": "APPINFO/HOLO.IMG"
+}
