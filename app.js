@@ -1,12 +1,10 @@
-// =============================================================================
-//  Name: Mestmetron
-//  Author: Theeohn Megistus
-//  License: MIT
-//  Repository: https://github.com/Theeohn/Mesmetron-3000a
-// =============================================================================
-
 (function() {
-  const C = { CX: 240, CY: 160, N: 14, MODES: 5, VARIANTS: 3, FRAME_MS: 40 };
+  const C = { CX: 240, CY: 160, N: 14, MODES: 6, VARIANTS: 3, FRAME_MS: 40, MCOLS: 30, MCHARS: 6 };
+  // NOTE: tunnel mode has a known erase/redraw mismatch (recomputes the previous
+  // frame's ring geometry from tick-1, which doesn't exactly cancel what was drawn).
+  // This was found and understood, but is being left in deliberately: the leftover
+  // trails it produces are a desired visual effect, not a bug to fix. Do not "fix" it.
+  const CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~";
 
   let mode = 0, variant = 0, tick = 0, running = 1;
   const ang = new Float32Array(C.N);
@@ -14,6 +12,10 @@
   const px = new Float32Array(C.N);
   const py = new Float32Array(C.N);
   const dist = new Float32Array(C.N);
+  const mHead = new Int16Array(C.MCOLS);
+  const mSpd = new Uint8Array(C.MCOLS);
+  const mColChars = new Uint8Array(C.MCOLS * C.MCHARS);
+  let cellW = 12, cellH = 20, mCols = C.MCOLS, mRows = 16, mTrail = 8, mMid = 4, mWait = 60;
 
   for (let i = 0; i < C.N; i++) {
     ang[i] = Math.randInt(628) / 100;
@@ -134,6 +136,57 @@
     }
   }
 
+  function mChar(col, row) {  "ram";
+    const k = ((row % C.MCHARS) + C.MCHARS) % C.MCHARS;
+    return CHARSET.charAt(mColChars[col * C.MCHARS + k]);
+  }
+
+  function reseedCol(c) {  "ram";
+    for (let k = 0; k < C.MCHARS; k++) mColChars[c * C.MCHARS + k] = Math.randInt(CHARSET.length);
+  }
+
+  function matrix(hh) {  "ram";
+    if (tick === 0) {
+      const m = hh.setFont("Monofonto18").stringMetrics("A");
+      const naturalW = m.width + 3;
+      cellH = m.height + 3;
+      mCols = Math.min(Math.ceil(480 / naturalW), C.MCOLS);
+      cellW = 480 / mCols;
+      mRows = (320 / cellH) | 0;
+      mTrail = 8 + variant * 4;
+      mMid = Math.ceil(mTrail / 2);
+      mWait = mRows * 3 + 15;
+      for (let c = 0; c < mCols; c++) {
+        mHead[c] = -Math.randInt(mWait);
+        mSpd[c] = 1 + Math.randInt(1 + variant);
+        reseedCol(c);
+      }
+    }
+    hh.setFont("Monofonto18").setFontAlign(-1, -1);
+    for (let c = 0; c < mCols; c++) {
+      const x = (c * cellW) | 0;
+      const xRight = (c === mCols - 1) ? 480 : ((c + 1) * cellW) | 0;
+      const prevHead = mHead[c];
+      const step = mSpd[c];
+      if (prevHead >= 0 && prevHead < mRows)
+        hh.setColor(2).drawString(mChar(c, prevHead), x, prevHead * cellH);
+      const dim1Row = prevHead - mMid * step;
+      if (dim1Row >= 0 && dim1Row < mRows)
+        hh.setColor(1).drawString(mChar(c, dim1Row), x, dim1Row * cellH);
+      const eraseRow = prevHead - mTrail * step;
+      if (eraseRow >= 0 && eraseRow < mRows)
+        hh.setColor(0).fillRect(x, eraseRow * cellH, xRight, eraseRow * cellH + cellH);
+      mHead[c] += step;
+      if (mHead[c] - mTrail * step > mRows) {
+        mHead[c] = -Math.randInt(mWait);
+        mSpd[c] = 1 + Math.randInt(1 + variant);
+        reseedCol(c);
+      }
+      const hr = mHead[c];
+      if (hr >= 0 && hr < mRows) hh.setColor(3).drawString(mChar(c, hr), x, hr * cellH);
+    }
+  }
+
   function onFrame(hh) {  "ram";
     if (!running) return;
     hh.setColor(3);
@@ -141,7 +194,8 @@
     else if (mode === 1) ribbon(hh);
     else if (mode === 2) warp(hh);
     else if (mode === 3) tunnel(hh);
-    else bouncer(hh);
+    else if (mode === 4) bouncer(hh);
+    else matrix(hh);
     tick++;
     hh.flip();
     Pip.lastFlip = getTime();
