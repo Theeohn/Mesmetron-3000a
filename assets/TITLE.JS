@@ -33,7 +33,7 @@
     { name: "WEB", file: "web.js" },
     { name: "RIBBON", file: "ribbon.js" },
     { name: "WARP", file: "warp.js" },
-    { name: "TUNNEL", file: "tunnel.js" },
+    { name: "VORTEX", file: "vortex.js" },
     { name: "BOUNCER", file: "bouncer.js" },
     { name: "MATRIX", file: "matrix.js" },
     { name: "KALEIDOSCOPE", file: "kaleidoscope.js" },
