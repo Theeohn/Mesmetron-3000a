@@ -4,4 +4,4 @@ Screensavers of all kinds, rendered locally, no videos.
 
 ## Controls
 
-Left wheel scroll changes screensaver, left wheel press pauses, right wheel scroll changes things in-screensaver like speed or shapes.
+Choose screensaver from title screen with either wheel, press left wheel to select and open menu again to change. Scroll left wheel while in screensaver for brightness, and right wheel changes different modifiers per screensaver.
