@@ -8,6 +8,11 @@
   // import/export in this environment. Only the currently active
   // screensaver's code is ever resident in memory; switching modes drops the
   // old one and loads the new one fresh.
+  //
+  // Menu audio: wild.wav loops for as long as we're sitting on the title
+  // screen (both on initial boot and whenever knob1 backs out of a
+  // screensaver), and is stopped the instant a screensaver is launched so it
+  // never plays underneath one.
   const BASE_PATH = "HOLO/MESMETRON/";
   const VARIANTS = 3;
   const FRAME_MS = 40;
@@ -33,6 +38,7 @@
       const idx = titleModule.getSelected();
       try {
         const mod = loadModule(titleModule.items[idx].file);
+        Pip.audioStop();
         mod.init(variant);
         mode = idx;
         currentModule = mod;
@@ -59,6 +65,8 @@
       currentModule = null;
       inMenu = 1;
       menuDirty = 1;
+      titleModule.repaint();
+      Pip.audioStart(BASE_PATH + "wild.wav", { repeat: true });
       Pip.playSound("TAB");
     }
   }
@@ -96,6 +104,7 @@
   h.clear();
   titleModule = loadModule("TITLE.JS");
   titleModule.init(0);
+  Pip.audioStart(BASE_PATH + "wild.wav", { repeat: true });
   const frameInterval = setInterval(onFrame, FRAME_MS);
 
   return {
@@ -107,6 +116,7 @@
       Pip.removeListener("knob1", onKnob1);
       Pip.removeListener("knob2", onKnob2);
       Pip.setBrightness(1.0);
+      Pip.audioStop();
       h.clear();
     }
   };
