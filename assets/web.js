@@ -1,25 +1,21 @@
 // MESMETRON screensaver module: "web"
 // A rotating cross-linked lattice of nodes tracing pulsing elliptical orbits.
-//
-// Module contract (see app.js for the full spec):
-//   init(variant) - reset all internal state for the given variant (0, 1, or 2)
-//   draw(h)        - render exactly one frame using the graphics handle h
-// This file must evaluate to a single object with those two methods, so wrap
-// everything in a self-invoking function expression: (function() { ... })()
-// (note the trailing parens - unlike app.js itself, this file is invoked by
-// app.js's own eval() call, not by the Pip-Boy OS, so it must invoke itself).
 
 (function() {
   const N = 14, CX = 240, CY = 160;
-  let variant = 0, tick = 0;
+  let variant = 0, lastVariant = 0, tick = 0;
   const ang = new Float32Array(N);
   const spd = new Float32Array(N);
   const px = new Float32Array(N);
   const py = new Float32Array(N);
+  
+  // Link offsets for variants 0, 1, and 2
+  const LINKS = new Int8Array([3, 7, 5]);
 
   return {
     init: function(v) {
       variant = v;
+      lastVariant = v;
       tick = 0;
       for (let i = 0; i < N; i++) {
         ang[i] = Math.randInt(628) / 100;
@@ -27,23 +23,47 @@
       }
     },
     draw: function(h) {  "ram";
-      const link = variant + 3;
+      const oldLink = LINKS[lastVariant];
+      const newLink = LINKS[variant];
+
       h.setColor(3);
       if (tick > 0) {
+        // Erase the old lines using the link configuration from the LAST frame
         h.setColor(0);
-        for (let i = 0; i < N; i++)
-          h.drawLine(px[i] | 0, py[i] | 0, px[(i + link) % N] | 0, py[(i + link) % N] | 0);
+        for (let i = 0; i < N; i++) {
+          h.drawLine(px[i] | 0, py[i] | 0, px[(i + oldLink) % N] | 0, py[(i + oldLink) % N] | 0);
+        }
         h.setColor(3);
       }
+      
       const rx = 100 + 130 * Math.abs(Math.sin(tick / 41));
       const ry = 70 + 90 * Math.abs(Math.sin(tick / 53 + 1));
+      
       for (let i = 0; i < N; i++) {
-        ang[i] += spd[i] * (1 + variant * 0.5);
-        px[i] = CX + rx * Math.cos(ang[i] * (1 + (i % 3) * 0.25));
-        py[i] = CY + ry * Math.sin(ang[i] * (1 + (i % 4) * 0.18));
+        // Orbit speed is now locked to the lowest default value
+        ang[i] += spd[i]; 
+        
+        if (variant === 0) {
+          // V0: Chaotic atomic orbits
+          px[i] = CX + rx * Math.cos(ang[i] * (1 + (i % 3) * 0.25));
+          py[i] = CY + ry * Math.sin(ang[i] * (1 + (i % 4) * 0.18));
+        } else if (variant === 1) {
+          // V1: 3D twisting helix / data column
+          px[i] = CX + rx * Math.cos(ang[i]);
+          py[i] = CY + ry * Math.sin(ang[i] * 3);
+        } else {
+          // V2: Complex starburst / geometric reticle
+          px[i] = CX + (rx * 0.8) * (Math.cos(ang[i]) + Math.cos(ang[i] * 4) * 0.4);
+          py[i] = CY + (ry * 0.8) * (Math.sin(ang[i]) + Math.sin(ang[i] * 4) * 0.4);
+        }
       }
-      for (let i = 0; i < N; i++)
-        h.drawLine(px[i] | 0, py[i] | 0, px[(i + link) % N] | 0, py[(i + link) % N] | 0);
+      
+      // Draw new lines using the current link configuration
+      for (let i = 0; i < N; i++) {
+        h.drawLine(px[i] | 0, py[i] | 0, px[(i + newLink) % N] | 0, py[(i + newLink) % N] | 0);
+      }
+        
+      lastVariant = variant;
       tick++;
     }
   };
