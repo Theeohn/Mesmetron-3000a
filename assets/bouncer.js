@@ -4,7 +4,7 @@
 
 (function() {
   let variant = 0, tick = 0;
-  let cx = 240, cy = 160, vx = 0, vy = 0;
+  let cx = 0, cy = 0, vx = 0, vy = 0;
   let sprite = null, spriteW = 0, spriteH = 0;
   let clearHalfW = 0, clearHalfH = 0;
   let clockStr = "", clockTick = 0;
@@ -29,11 +29,12 @@
   }
 
   return {
+    id: "BOUNCER",
+    remove: function() {},
     init: function(v) {
       variant = v;
       tick = 0;
       clockTick = 0;
-      cx = 240; cy = 160;
       sprite = null;
       
       // Calculate a random trajectory using Math.randInt to adhere to Espruino constraints.
@@ -69,8 +70,19 @@
           clearHalfH = spriteH / 2;
         }
       }
-      cx = E.clip(cx, spriteW / 2, 480 - spriteW / 2);
-      cy = E.clip(cy, spriteH / 2, 320 - spriteH / 2);
+      
+      // Calculate a 40px bounding margin while accommodating the sprite's dimensions.
+      // Screen dimensions are 480x320. 
+      const halfW = spriteW / 2;
+      const halfH = spriteH / 2;
+      const minX = Math.max(40, halfW) | 0;
+      const maxX = Math.min(440, 480 - halfW) | 0;
+      const minY = Math.max(40, halfH) | 0;
+      const maxY = Math.min(280, 320 - halfH) | 0;
+      
+      // Randomize the starting position within the bounds
+      cx = minX + Math.randInt(maxX - minX + 1);
+      cy = minY + Math.randInt(maxY - minY + 1);
     },
     draw: function(h) {  "ram";
       if (tick > 0) {
@@ -80,8 +92,25 @@
       }
 
       cx += vx; cy += vy;
-      if (cx < spriteW / 2 || cx > 480 - spriteW / 2) vx = -vx;
-      if (cy < spriteH / 2 || cy > 320 - spriteH / 2) vy = -vy;
+
+      // Wall bounce + angle variation, ported from RACE.JS's jitterVelocity():
+      // reflect exactly off the edge, then rotate the resulting velocity vector
+      // by a small random offset (+/-10 degrees) so repeated bounces off the
+      // same wall don't all leave at the identical angle. A rotation can't
+      // change a vector's magnitude, so speed stays locked at ~2.76 forever,
+      // no matter how many times this fires.
+      let bounced = false;
+      if (cx < spriteW / 2 || cx > 480 - spriteW / 2) { vx = -vx; bounced = true; }
+      if (cy < spriteH / 2 || cy > 320 - spriteH / 2) { vy = -vy; bounced = true; }
+      if (bounced) {
+        const deg = Math.randInt(21) - 10; // -10..+10 degrees
+        const rad = deg * 0.017453292519943295;
+        const c = Math.cos(rad), s = Math.sin(rad);
+        const ovx = vx, ovy = vy;
+        vx = ovx * c - ovy * s;
+        vy = ovx * s + ovy * c;
+      }
+
       cx = E.clip(cx, spriteW / 2, 480 - spriteW / 2);
       cy = E.clip(cy, spriteH / 2, 320 - spriteH / 2);
 
