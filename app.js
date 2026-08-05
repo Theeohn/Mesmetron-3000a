@@ -17,6 +17,12 @@
   const VARIANTS = 3;
   const FRAME_MS = 40;
 
+  // Save the original scan effect state to properly restore it on exit
+  const originalNoScan = Pip.blitOptions.noScanEffect;
+  
+  // Attempt to disable just the scanline effect globally for this app
+  Pip.blitOptions.noScanEffect = true;
+
   let mode = 0, variant = 0;
   let inMenu = 1, menuDirty = 1;
   let brightnessStep = 20; // 1 to 20 OS scale
@@ -118,6 +124,13 @@
       Pip.setBrightness(1.0);
       Pip.audioStop();
       h.clear();
+      
+      // Restore OS screen effects
+      if (originalNoScan !== undefined) {
+        Pip.blitOptions.noScanEffect = originalNoScan;
+      } else {
+        delete Pip.blitOptions.noScanEffect;
+      }
     }
   };
 });
