@@ -19,7 +19,8 @@
     },
     draw: function(h) {  "ram";
       h.setColor(3);
-      const sides = 5 + variant * 2;
+      // Adjusted to produce 3, 4, and 5 sided shapes based on variant (0, 1, 2)
+      const sides = 3 + variant;
       const rot = tick / 45;
       if (tick > 0) {
         h.setColor(0);
