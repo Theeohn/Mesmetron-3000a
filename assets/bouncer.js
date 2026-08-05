@@ -34,8 +34,21 @@
       tick = 0;
       clockTick = 0;
       cx = 240; cy = 160;
-      vx = 1.9; vy = 2.0;
       sprite = null;
+      
+      // Calculate a random trajectory using Math.randInt to adhere to Espruino constraints.
+      // Keep generating until the angle is strictly NOT within 5 degrees of 
+      // cardinals (0, 90, 180, 270) or diagonals (45, 135, 225, 315).
+      let angleDeg, mod;
+      do {
+        angleDeg = Math.randInt(360);
+        mod = angleDeg % 90;
+      } while (mod <= 5 || mod >= 85 || (mod >= 40 && mod <= 50));
+      
+      // Maintain the original speed magnitude of ~2.76
+      let angleRad = angleDeg * (Math.PI / 180);
+      vx = 2.76 * Math.cos(angleRad);
+      vy = 2.76 * Math.sin(angleRad);
       
       if (variant === 0) {
         clockStr = Pip.currentDateTime()[0];
