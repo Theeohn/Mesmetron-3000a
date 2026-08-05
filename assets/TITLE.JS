@@ -17,18 +17,6 @@
 //   getSelected()     - returns the current selected index
 //   items             - the ITEMS array itself, so app.js can read .file
 //   draw(h)           - render the box interior only (see below)
-//
-// Background: MSMR.BIN is streamed straight into the frame buffer using the
-// standard streaming-blit pattern (E.openFile + chunked reads into a
-// Uint8Array view of h.buffer). This, plus the box border, is painted only
-// ONCE per menu visit - from init(), not draw() - since neither ever changes
-// while the menu is up. draw(h) is the cheap per-scroll redraw: it only
-// clears and repaints the box's interior (the 3 visible rows + indicators),
-// never the background or border, so scrolling doesn't re-stream the BIN or
-// touch pixels outside the list. Looping menu audio (wild.wav) is app.js's
-// responsibility to start/stop, since it has to persist across repeated
-// visits to this screen and must not play during a screensaver - see app.js
-// for that logic.
 
 (function() {
   // To add your own screensaver:
@@ -52,7 +40,7 @@
     { name: "WEB", file: "web.js" }
   ];
   const BX1 = 90, BY1 = 152, BX2 = 390, BY2 = 294;
-  const ROWY0 = 185, ROWH = 38;
+  const ROWY0 = 177, ROWH = 30;
   let selected = 0;
   let scroll = 0;
 
@@ -77,36 +65,51 @@
 
   function drawList() {
     h.setColor(0).fillRect(BX1 + 2, BY1 + 2, BX2 - 2, BY2 - 2);
-    h.setFont("Monofonto28").setFontAlign(0, 0);
+    h.setFont("Monofonto23").setFontAlign(0, 0);
 
-    for (let i = 0; i < 3 && scroll + i < ITEMS.length; i++) {
+    for (let i = 0; i < 4 && scroll + i < ITEMS.length; i++) {
       const idx = scroll + i;
       const cy = ROWY0 + i * ROWH;
-      if (idx === selected) {
-        h.setColor(3).fillRect(BX1 + 6, cy - 17, BX2 - 6, cy + 17);
+      const isSelected = (idx === selected);
+
+      if (isSelected) {
+        h.setColor(3).fillRect(BX1 + 6, cy - 14, BX2 - 6, cy + 14);
         h.setColor(0).drawString(ITEMS[idx].name, 240, cy);
       } else {
         h.setColor(3).drawString(ITEMS[idx].name, 240, cy);
       }
-    }
 
-    // Scroll indicators (up/down filled triangles rendered using line loops)
-    h.setColor(3);
-    if (scroll > 0) {
-      for (let py = 0; py <= 4; py++) {
-        h.drawLine(100 - py, BY1 + 12 + py, 100 + py, BY1 + 12 + py);
-        h.drawLine(380 - py, BY1 + 12 + py, 380 + py, BY1 + 12 + py);
+      // In-line scroll indicators
+      const leftX = BX1 + 24;
+      const rightX = BX2 - 24;
+
+      // Up indicator on the first visible row if we can scroll up
+      if (i === 0 && scroll > 0) {
+        h.setColor(isSelected ? 0 : 3);
+        for (let dy = 0; dy < 15; dy++) {
+          let w = (dy >> 1);
+          let y = cy - 7 + dy;
+          h.drawLine(leftX - w, y, leftX + w, y);
+          h.drawLine(rightX - w, y, rightX + w, y);
+        }
       }
-    }
-    if (scroll + 3 < ITEMS.length) {
-      for (let py = 0; py <= 4; py++) {
-        h.drawLine(100 - py, BY2 - 12 - py, 100 + py, BY2 - 12 - py);
-        h.drawLine(380 - py, BY2 - 12 - py, 380 + py, BY2 - 12 - py);
+
+      // Down indicator on the fourth visible row if we can scroll down
+      if (i === 3 && scroll + 4 < ITEMS.length) {
+        h.setColor(isSelected ? 0 : 3);
+        for (let dy = 0; dy < 15; dy++) {
+          let w = (dy >> 1);
+          let y = cy + 7 - dy;
+          h.drawLine(leftX - w, y, leftX + w, y);
+          h.drawLine(rightX - w, y, rightX + w, y);
+        }
       }
     }
   }
 
   return {
+    id: "MESMETRON_MENU",
+    remove: function() {},
     items: ITEMS,
     repaint: function() {
       drawBackground();
@@ -114,18 +117,18 @@
     },
     init: function(startIndex) {
       selected = E.clip(startIndex || 0, 0, ITEMS.length - 1);
-      scroll = selected > 2 ? selected - 2 : 0;
-      if (scroll > ITEMS.length - 3) scroll = Math.max(0, ITEMS.length - 3);
+      scroll = selected > 3 ? selected - 3 : 0;
+      if (scroll > ITEMS.length - 4) scroll = Math.max(0, ITEMS.length - 4);
       this.repaint();
     },
     move: function(dir) {
       selected = E.clip(selected + dir, 0, ITEMS.length - 1);
       if (selected < scroll) {
         scroll = selected;
-      } else if (selected >= scroll + 3) {
-        scroll = selected - 2;
+      } else if (selected >= scroll + 4) {
+        scroll = selected - 3;
       }
-      if (scroll > ITEMS.length - 3) scroll = Math.max(0, ITEMS.length - 3);
+      if (scroll > ITEMS.length - 4) scroll = Math.max(0, ITEMS.length - 4);
       if (scroll < 0) scroll = 0;
     },
     getSelected: function() {
