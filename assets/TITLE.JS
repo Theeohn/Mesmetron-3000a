@@ -31,9 +31,11 @@
   // crashing, and drops you back at this menu so you can try something else.
   const ITEMS = [
     { name: "BOUNCER", file: "bouncer.js" },
+    { name: "FIREWORKS", file: "fireworks.js" },
     { name: "KALEIDOSCOPE", file: "kaleidoscope.js" },
     { name: "MATRIX", file: "matrix.js" },
     { name: "RIBBON", file: "ribbon.js" },
+    { name: "SNAKE", file: "snake.js" },
     { name: "SHAPES", file: "shapes.js" },
     { name: "VORTEX", file: "vortex.js" },
     { name: "WARP", file: "warp.js" },
