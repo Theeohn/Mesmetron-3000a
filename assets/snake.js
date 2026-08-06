@@ -1,93 +1,77 @@
-// MESMETRON screensaver module: "matrix"
-// Code-rain columns with autonomous, independent column spawning.
+// MESMETRON screensaver module: "snake"
+// A 9px round brush traces an Archimedean spiral (r = B*theta), coil pitch
+// tuned just under the brush width, so a completed pass paints the screen
+// edge-to-edge with no gaps - a spinning, wiping fill rather than a thin
+// line. See vortex.js/web.js for the module contract (init/draw only, no
+// id/remove needed here - app.js never calls either on the active module).
+//
+// Like vortex.js, draw() never calls a full h.clear() - it only ever
+// touches the pixels of the shape it's drawing. That persistence is what
+// turns a plain restart into a wipe: when a pass finishes, the brush resets
+// to its start point, flips rotation (CW/CCW alternate each pass) and
+// steps to the next palette color, painting straight over the previous
+// pass instead of a hard cut.
+//
+// Knob2 selects the pattern (app.js's VARIANTS = 3):
+//   0 - one snake, center -> edge outward.
+//   1 - one snake, edge -> center inward.
+//   2 - both at once, crossing paths in the middle.
+//
+// vortex.js's erase pass deliberately recomputes the prior frame's ring
+// geometry at the wrong rotation rate (tick-1 fed through /30 instead of
+// /45) - a known mismatch, kept on purpose because the imperfect erase is
+// what makes the trails. Copying that exact trick here would fight the
+// point of this module (a full, gapless fill), so instead modes 0 and 2
+// both give the two brushes the *same* coil pitch (gapless on their own)
+// but a deliberately mismatched pace: the outward and inward snakes
+// advance at different arc-length rates, so in mode 2 they never lock into
+// a fixed relationship - the ring where they cross keeps drifting pass to
+// pass. Same idea as vortex's note (an intentional, uncorrected mismatch
+// is the effect, not a bug), just applied as a timing offset instead of a
+// literal erase.
 
 (function() {
-  const MCOLS = 48, MCHARS = 6;
-  const CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~";
+  const CX = 240, CY = 160, MAXR = 289, BR = 4;  // center, corner-covering radius, 9px brush
+  const B = 8 / 6.283;               // coil pitch: 8px/turn, under the 9px brush - gapless on its own
+  const K_OUT = 2 * 5 * B;           // outward snake: ~5px of arc length per tick
+  const K_IN = 2 * 4 * B;            // inward snake: ~4px per tick - deliberately off the outward pace
+  const MICRO = 4;                   // brush stamps drawn per frame
+  const PAL = [3, 1, 2];             // bright / amber / dim, cycled each completed pass
 
-  let variant = 0, needsSetup = 1;
-  const mHead = new Int16Array(MCOLS);
-  const mSpd = new Uint8Array(MCOLS);
-  const mColChars = new Uint8Array(MCOLS * MCHARS);
-  let cellW = 20, stepW = 10, cellH = 26, mCols = MCOLS, mRows = 13, mTrail = 8, mMid = 4;
+  let mode = 0;
+  let tA = 0, dirA = 1, colA = 0;    // outward snake (modes 0 and 2)
+  let tB = 0, dirB = -1, colB = 2;   // inward snake  (modes 1 and 2)
 
-  function mChar(col, row) {  "ram";
-    const k = ((row % MCHARS) + MCHARS) % MCHARS;
-    return CHARSET.charAt(mColChars[col * MCHARS + k]);
+  function paintOut() {
+    for (let i = 0; i < MICRO; i++) {
+      const r = Math.sqrt(K_OUT * tA);
+      if (r >= MAXR) { tA = 0; dirA = -dirA; colA = (colA + 1) % 3; continue; }
+      const a = (r / B) * dirA;
+      h.setColor(PAL[colA]).fillCircle((CX + r * Math.cos(a)) | 0, (CY + r * Math.sin(a)) | 0, BR);
+      tA++;
+    }
   }
 
-  function reseedCol(c) {  "ram";
-    for (let k = 0; k < MCHARS; k++) mColChars[c * MCHARS + k] = Math.randInt(CHARSET.length);
+  function paintIn() {
+    for (let i = 0; i < MICRO; i++) {
+      const rr = MAXR * MAXR - K_IN * tB;
+      if (rr <= 0) { tB = 0; dirB = -dirB; colB = (colB + 1) % 3; continue; }
+      const r = Math.sqrt(rr);
+      const a = (r / B) * dirB;
+      h.setColor(PAL[colB]).fillCircle((CX + r * Math.cos(a)) | 0, (CY + r * Math.sin(a)) | 0, BR);
+      tB++;
+    }
   }
 
   return {
-    init: function(v) {
-      variant = v;
-      needsSetup = 1;
+    init: function(variant) {
+      mode = variant;
+      tA = 0; dirA = 1; colA = 0;
+      tB = 0; dirB = -1; colB = 2;
     },
     draw: function(h) {  "ram";
-      if (needsSetup) {
-        const m = h.setFont("Monofonto23").stringMetrics("A");
-        const naturalW = m.width + 3;
-        cellH = m.height + 3;
-        const baseCols = Math.min(Math.ceil(480 / naturalW), 24);
-        mCols = Math.min(baseCols * 2, MCOLS);
-        cellW = 480 / baseCols;
-        stepW = cellW / 2;
-        mRows = Math.ceil(320 / cellH);
-        const baseSpd = variant === 0 ? 12 : (variant === 1 ? 9 : 6);
-        mTrail = 8;
-        mMid = 4;
-        for (let c = 0; c < mCols; c++) {
-          if (Math.randInt(4) === 0) {
-            mSpd[c] = baseSpd;
-            mHead[c] = Math.randInt((mRows + mTrail) * 12);
-            reseedCol(c);
-          } else {
-            mHead[c] = -1;
-          }
-        }
-        needsSetup = 0;
-      }
-
-      const baseSpd = variant === 0 ? 12 : (variant === 1 ? 9 : 6);
-      h.setFont("Monofonto23").setFontAlign(-1, -1);
-      for (let c = 0; c < mCols; c++) {
-        if (mHead[c] < 0) {
-          if (Math.randInt(30) === 0) {
-            mSpd[c] = baseSpd;
-            mHead[c] = 0;
-            reseedCol(c);
-          } else {
-            continue;
-          }
-        }
-        const x = (c * stepW) | 0;
-        const xRight = Math.min(480, (x + cellW) | 0);
-        const headVal = mHead[c];
-        const step = mSpd[c];
-
-        const eraseRow = ((headVal - (mTrail * 12)) / 12) | 0;
-        if (eraseRow >= 0 && eraseRow < mRows)
-          h.setColor(0).fillRect(x, eraseRow * cellH, xRight, eraseRow * cellH + cellH);
-
-        const dimRow = ((headVal - (mMid * 12)) / 12) | 0;
-        if (dimRow >= 0 && dimRow < mRows)
-          h.setColor(1).drawString(mChar(c, dimRow), x, dimRow * cellH);
-
-        const bodyRow = ((headVal - step) / 12) | 0;
-        if (headVal >= step && bodyRow >= 0 && bodyRow < mRows)
-          h.setColor(2).drawString(mChar(c, bodyRow), x, bodyRow * cellH);
-
-        const hr = (headVal / 12) | 0;
-        if (hr >= 0 && hr < mRows)
-          h.setColor(3).drawString(mChar(c, hr), x, hr * cellH);
-
-        mHead[c] += step;
-        if (headVal - (mTrail * 12) > mRows * 12) {
-          mHead[c] = -1;
-        }
-      }
+      if (mode !== 1) paintOut();
+      if (mode !== 0) paintIn();
     }
   };
 });
