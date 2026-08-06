@@ -39,7 +39,7 @@
         mTrail = 8;
         mMid = 4;
         for (let c = 0; c < mCols; c++) {
-          if (Math.randInt(2) === 0) {
+          if (Math.randInt(4) === 0) {
             mSpd[c] = baseSpd;
             mHead[c] = Math.randInt((mRows + mTrail) * 12);
             reseedCol(c);
@@ -54,7 +54,7 @@
       h.setFont("Monofonto23").setFontAlign(-1, -1);
       for (let c = 0; c < mCols; c++) {
         if (mHead[c] < 0) {
-          if (Math.randInt(20) === 0) {
+          if (Math.randInt(30) === 0) {
             mSpd[c] = baseSpd;
             mHead[c] = 0;
             reseedCol(c);
