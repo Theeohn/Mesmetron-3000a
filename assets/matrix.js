@@ -1,27 +1,15 @@
 // MESMETRON screensaver module: "matrix"
-// Code-rain columns with a fixed-cadence, neighbor-aware drop scheduler:
-// exactly one new drop is released on a constant timer, and it's only placed
-// in a column whose immediate left/right neighbors are currently empty - so
-// drops never fall in two adjacent columns at once, and the overall rate
-// never drifts. See web.js for the module contract (init/draw) and the
-// file-wrapping convention.
-//
-// Note: unlike the other modules, this one needs the graphics handle to
-// measure font metrics before it can lay out columns. Since init(variant)
-// doesn't receive the handle, that one-time setup is deferred to the first
-// draw(h) call instead (guarded by needsSetup), the same way the original
-// single-file version deferred it to its first tick===0 frame.
+// Code-rain columns with autonomous, independent column spawning.
 
 (function() {
-  const MCOLS = 30, MCHARS = 6, RAIN_EVERY = 2;
+  const MCOLS = 48, MCHARS = 6;
   const CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~";
 
   let variant = 0, needsSetup = 1;
   const mHead = new Int16Array(MCOLS);
   const mSpd = new Uint8Array(MCOLS);
   const mColChars = new Uint8Array(MCOLS * MCHARS);
-  let cellW = 12, cellH = 20, mCols = MCOLS, mRows = 16, mTrail = 8, mMid = 4;
-  let mSchedTimer = RAIN_EVERY;
+  let cellW = 20, stepW = 10, cellH = 26, mCols = MCOLS, mRows = 13, mTrail = 8, mMid = 4;
 
   function mChar(col, row) {  "ram";
     const k = ((row % MCHARS) + MCHARS) % MCHARS;
@@ -32,23 +20,6 @@
     for (let k = 0; k < MCHARS; k++) mColChars[c * MCHARS + k] = Math.randInt(CHARSET.length);
   }
 
-  function tryActivate(randomStart) {  "ram";
-    const start = Math.randInt(mCols);
-    let attempts = 0;
-    while (attempts < mCols) {
-      const c = (start + attempts) % mCols;
-      attempts++;
-      const leftOk = (c === 0) || (mHead[c - 1] < 0);
-      const rightOk = (c === mCols - 1) || (mHead[c + 1] < 0);
-      if (mHead[c] < 0 && leftOk && rightOk) {
-        mSpd[c] = 1 + Math.randInt(1 + variant);
-        mHead[c] = randomStart ? Math.randInt(mRows + mTrail * mSpd[c]) : 0;
-        reseedCol(c);
-        return;
-      }
-    }
-  }
-
   return {
     init: function(v) {
       variant = v;
@@ -56,45 +27,66 @@
     },
     draw: function(h) {  "ram";
       if (needsSetup) {
-        const m = h.setFont("Monofonto18").stringMetrics("A");
+        const m = h.setFont("Monofonto23").stringMetrics("A");
         const naturalW = m.width + 3;
         cellH = m.height + 3;
-        mCols = Math.min(Math.ceil(480 / naturalW), MCOLS);
-        cellW = 480 / mCols;
-        mRows = (320 / cellH) | 0;
-        mTrail = 8 + variant * 4;
-        mMid = Math.ceil(mTrail / 2);
-        mSchedTimer = RAIN_EVERY;
-        for (let c = 0; c < mCols; c++) mHead[c] = -1;
-        for (let i = 0; i < 8; i++) tryActivate(true);
+        const baseCols = Math.min(Math.ceil(480 / naturalW), 24);
+        mCols = Math.min(baseCols * 2, MCOLS);
+        cellW = 480 / baseCols;
+        stepW = cellW / 2;
+        mRows = Math.ceil(320 / cellH);
+        const baseSpd = variant === 0 ? 12 : (variant === 1 ? 9 : 6);
+        mTrail = 8;
+        mMid = 4;
+        for (let c = 0; c < mCols; c++) {
+          if (Math.randInt(2) === 0) {
+            mSpd[c] = baseSpd;
+            mHead[c] = Math.randInt((mRows + mTrail) * 12);
+            reseedCol(c);
+          } else {
+            mHead[c] = -1;
+          }
+        }
         needsSetup = 0;
       }
-      mSchedTimer--;
-      if (mSchedTimer <= 0) {
-        tryActivate();
-        mSchedTimer = RAIN_EVERY;
-      }
-      h.setFont("Monofonto18").setFontAlign(-1, -1);
+
+      const baseSpd = variant === 0 ? 12 : (variant === 1 ? 9 : 6);
+      h.setFont("Monofonto23").setFontAlign(-1, -1);
       for (let c = 0; c < mCols; c++) {
-        if (mHead[c] < 0) continue;
-        const x = (c * cellW) | 0;
-        const xRight = (c === mCols - 1) ? 480 : ((c + 1) * cellW) | 0;
-        const prevHead = mHead[c];
+        if (mHead[c] < 0) {
+          if (Math.randInt(20) === 0) {
+            mSpd[c] = baseSpd;
+            mHead[c] = 0;
+            reseedCol(c);
+          } else {
+            continue;
+          }
+        }
+        const x = (c * stepW) | 0;
+        const xRight = Math.min(480, (x + cellW) | 0);
+        const headVal = mHead[c];
         const step = mSpd[c];
-        if (prevHead >= 0 && prevHead < mRows)
-          h.setColor(2).drawString(mChar(c, prevHead), x, prevHead * cellH);
-        const dim1Row = prevHead - mMid * step;
-        if (dim1Row >= 0 && dim1Row < mRows)
-          h.setColor(1).drawString(mChar(c, dim1Row), x, dim1Row * cellH);
-        const eraseRow = prevHead - mTrail * step;
+
+        const eraseRow = ((headVal - (mTrail * 12)) / 12) | 0;
         if (eraseRow >= 0 && eraseRow < mRows)
           h.setColor(0).fillRect(x, eraseRow * cellH, xRight, eraseRow * cellH + cellH);
+
+        const dimRow = ((headVal - (mMid * 12)) / 12) | 0;
+        if (dimRow >= 0 && dimRow < mRows)
+          h.setColor(1).drawString(mChar(c, dimRow), x, dimRow * cellH);
+
+        const bodyRow = ((headVal - step) / 12) | 0;
+        if (headVal >= step && bodyRow >= 0 && bodyRow < mRows)
+          h.setColor(2).drawString(mChar(c, bodyRow), x, bodyRow * cellH);
+
+        const hr = (headVal / 12) | 0;
+        if (hr >= 0 && hr < mRows)
+          h.setColor(3).drawString(mChar(c, hr), x, hr * cellH);
+
         mHead[c] += step;
-        if (mHead[c] - mTrail * step > mRows) {
+        if (headVal - (mTrail * 12) > mRows * 12) {
           mHead[c] = -1;
         }
-        const hr = mHead[c];
-        if (hr >= 0 && hr < mRows) h.setColor(3).drawString(mChar(c, hr), x, hr * cellH);
       }
     }
   };
