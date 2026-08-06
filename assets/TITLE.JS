@@ -35,11 +35,12 @@
     { name: "KALEIDOSCOPE", file: "kaleidoscope.js" },
     { name: "MATRIX", file: "matrix.js" },
     { name: "RIBBON", file: "ribbon.js" },
-    { name: "SNAKE", file: "snake.js" },
+    { name: "SPIRAL", file: "spiral.js" },
     { name: "SHAPES", file: "shapes.js" },
     { name: "VORTEX", file: "vortex.js" },
     { name: "WARP", file: "warp.js" },
-    { name: "WEB", file: "web.js" }
+    { name: "WEB", file: "web.js" },
+    { name: "ZOOM", file: "zoom.js" }
   ];
   const BX1 = 90, BY1 = 152, BX2 = 390, BY2 = 294;
   const ROWY0 = 177, ROWH = 30;
