@@ -18,17 +18,19 @@
 // never calls id/remove on the active module).
 //
 // Knob2 selects the pattern (app.js's VARIANTS = 3):
-//   0 - one wire, spiraling outward from center.
-//   1 - two wires, spiraling outward from center, opposite each other.
+//   0 - two wires, spiraling outward from center, opposite each other.
+//   1 - three wires, spiraling outward from center, 120 degrees apart.
 //   2 - four wires: two spiraling outward from center (opposite each
 //       other), and two more spiraling inward from the display's edge
 //       (also opposite each other, wound the other direction). Both
 //       pairs use the exact same spiral math - one pair grows r from 0
 //       up to the edge, the other shrinks r from the edge down to 0 - and
-//       they cross each other continuously as they grow. This is twice
-//       the draw calls per tick of mode 1, so if a lag shows up on real
-//       hardware it'll show up here first - MICRO below is the lever to
-//       pull (draws fewer ticks per frame, same total ticks either way).
+//       they cross each other continuously as they grow. Draw calls per
+//       tick scale with wire count (4 lines/wire/tick): mode 0 draws 8,
+//       mode 1 draws 12, mode 2 draws 16 - the heaviest load, so if a lag
+//       shows up on real hardware it'll show up here first - MICRO below
+//       is the lever to pull (draws fewer ticks per frame, same total
+//       ticks either way).
 
 (function() {
   const CX = 240, CY = 160;       // dead center
@@ -111,9 +113,11 @@
       if (t > N) continue;
       if (mode === 0) {
         grow(0, t, 0, 1);
+        grow(1, t, 3.1416, 1);
       } else if (mode === 1) {
         grow(0, t, 0, 1);
-        grow(1, t, 3.1416, 1);
+        grow(1, t, 2.0944, 1);
+        grow(2, t, 4.1888, 1);
       } else {
         grow(0, t, 0, 1);
         grow(1, t, 3.1416, 1);
@@ -124,14 +128,16 @@
     tick += MICRO;
     if (tick > N) {
       passIdx = (passIdx + 1) % NPASS;
-      // modes 1 and 2 pair a wire at angOff=0 with one at angOff=PI, so the
-      // visible pattern only depends on phase mod PI. bisectAngle's lowest
-      // bit always lands on the PI bit of the result and alternates every
-      // single pass, which - for a PI-paired mode - just swaps which wire
-      // is which without changing what's on screen: passIdx*2 drops that
-      // redundant bit so every pass gets a genuinely new angle instead of
-      // retracing the pass that just finished.
-      phase = bisectAngle(mode === 0 ? passIdx : passIdx * 2);
+      // modes 0 and 2 both pair a wire at angOff=0 with one at angOff=PI,
+      // so their visible pattern only depends on phase mod PI. bisectAngle's
+      // lowest bit always lands on the PI bit of the result and alternates
+      // every single pass, which - for a PI-paired mode - just swaps which
+      // wire is which without changing what's on screen: passIdx*2 drops
+      // that redundant bit so every pass gets a genuinely new angle instead
+      // of retracing the pass that just finished. Mode 1's three wires are
+      // 2pi/3 apart, and 128 isn't divisible by 3, so no pass can ever land
+      // on another pass's exact rotational twin - it uses the plain sequence.
+      phase = bisectAngle(mode === 1 ? passIdx : passIdx * 2);
       if (passIdx === 0) {
         invert = !invert;
         coreColor = invert ? 0 : 3;
