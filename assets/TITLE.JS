@@ -1,22 +1,9 @@
 // MESMETRON title/menu screen.
 //
-// A bordered, filled list box showing each screensaver name. Knob1 and knob2
-// both scroll the selection; app.js decides what a press does (start the
-// highlighted screensaver).
-//
 // This is the SINGLE list of available screensavers - app.js has no list of
 // its own, it just reads .file off of whichever item is currently selected.
 // That means adding a new screensaver only ever requires editing ONE file:
 // this one. See the ITEMS array below.
-//
-// This module's contract is slightly different from a screensaver's, since
-// it needs to expose selection state (and the item list itself) to the
-// launcher:
-//   init(startIndex) - reset to a given selected index (persists across visits)
-//   move(dir)         - shift the selection by dir, clamping at ends
-//   getSelected()     - returns the current selected index
-//   items             - the ITEMS array itself, so app.js can read .file
-//   draw(h)           - render the box interior only (see below)
 
 (function() {
   // To add your own screensaver:
@@ -39,8 +26,7 @@
     { name: "SHAPES", file: "shapes.js" },
     { name: "VORTEX", file: "vortex.js" },
     { name: "WARP", file: "warp.js" },
-    { name: "WEB", file: "web.js" },
-    { name: "ZOOM", file: "zoom.js" }
+    { name: "WEB", file: "web.js" }
   ];
   const BX1 = 90, BY1 = 152, BX2 = 390, BY2 = 294;
   const ROWY0 = 177, ROWH = 30;
