@@ -1,7 +1,10 @@
 // MESMETRON screensaver module: "fireworks"
 // Simulates celebratory fireworks mortars with parabolic arcs, randomized
 // launch timings, and particle explosions constrained within safe display bounds.
-// See web.js for the module contract (init/draw) and file-wrapping convention.
+//
+// Owns its own knob1 (rotate + short press) and knob2 (rotate + press)
+// input while active; see web.js for the full module contract
+// (init/draw/remove) and file-wrapping convention.
 
 (function() {
   const W = 480;
@@ -14,11 +17,14 @@
   let particles = [];
   let spawnTimer = 0;
   let activeMax = 3; // Dynamically set by knob2 variant
+  let variant = 0;
+  let brightnessStep = 20, lastKnob = 0;
 
-  function init(variant) {
-    // variant is 0, 1, or 2 from app.js knob2 scroll.
+  function setup(v) {
+    // variant is 0, 1, or 2 from knob2 rotation.
     // Map this to 3, 4, or 5 maximum active shells.
-    activeMax = 3 + variant;
+    variant = v;
+    activeMax = 3 + v;
 
     // Pre-allocate up to absolute MAX_SHELLS to prevent memory fragmentation on the Espruino
     shells = [];
@@ -199,8 +205,42 @@
     }
   }
 
+  function onKnob1(dir, long) {  "ram";
+    if (dir) {
+      const now = getTime();
+      if (now - lastKnob < 0.03) return;
+      lastKnob = now;
+      brightnessStep = E.clip(brightnessStep + (dir > 0 ? -1 : 1), 1, 20);
+      Pip.setBrightness(brightnessStep / 20.0);
+      if (Pip.playSound) Pip.playSound("HIGHLIGHT");
+    }
+    // dir === 0 && !long -> short press, reserved for this module. A long
+    // press is handled by the launcher, which returns to the menu.
+  }
+
+  function onKnob2(dir) {  "ram";
+    if (dir) {
+      variant = (variant + dir + 3) % 3;
+      h.clear();
+      setup(variant);
+      Pip.playSound("HIGHLIGHT");
+    } else {
+      h.clear();
+      Pip.playSound("SELECT");
+    }
+  }
+
   return { 
-    init: init, 
-    draw: draw 
+    id: "FIREWORKS",
+    init: function(v) {
+      setup(v);
+      Pip.on("knob1", onKnob1);
+      Pip.on("knob2", onKnob2);
+    },
+    draw: draw,
+    remove: function() {
+      Pip.removeListener("knob1", onKnob1);
+      Pip.removeListener("knob2", onKnob2);
+    }
   };
 });

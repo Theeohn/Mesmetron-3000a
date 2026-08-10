@@ -2,35 +2,71 @@
 // A radiating starfield with filled circles zooming past,
 // increasing in size across 10 distance rings.
 // Tuned for a higher average on-screen count while preventing waves of 3+.
-// See web.js for the module contract (init/draw) and file-wrapping convention.
+//
+// Owns its own knob1 (rotate + short press) and knob2 (rotate + press)
+// input while active; see web.js for the full module contract
+// (init/draw/remove) and file-wrapping convention.
 
 (function() {
   const MAX_N = 26, CX = 240, CY = 160;
   const STAR_COUNTS = [17, 23, 26]; // Max stars for variants 0, 1, 2
   const MIN_ACTIVE = [11, 17, 20];  // Max minus 6 to keep the minimum shown count high
   let variant = 0, tick = 0, spawnCooldown = 0, quickSpawns = 0;
+  let brightnessStep = 20, lastKnob = 0;
   const ang = new Float32Array(MAX_N);
   const dist = new Float32Array(MAX_N);
 
+  function setup(v) {
+    variant = v;
+    tick = 0;
+    spawnCooldown = 0;
+    quickSpawns = 0;
+    const currentN = STAR_COUNTS[variant];
+    const minActive = MIN_ACTIVE[variant];
+
+    // Initialize all stars as inactive (-1) first
+    for (let i = 0; i < MAX_N; i++) {
+      dist[i] = -1;
+    }
+
+    // Pre-seed up to the minimum required active count so it never starts sparse
+    for (let i = 0; i < minActive; i++) {
+      dist[i] = Math.randInt(250) + 10; // Spread them across various initial depths
+      ang[i] = Math.randInt(628) / 100;
+    }
+  }
+
+  function onKnob1(dir, long) {  "ram";
+    if (dir) {
+      const now = getTime();
+      if (now - lastKnob < 0.03) return;
+      lastKnob = now;
+      brightnessStep = E.clip(brightnessStep + (dir > 0 ? -1 : 1), 1, 20);
+      Pip.setBrightness(brightnessStep / 20.0);
+      if (Pip.playSound) Pip.playSound("HIGHLIGHT");
+    }
+    // dir === 0 && !long -> short press, reserved for this module. A long
+    // press is handled by the launcher, which returns to the menu.
+  }
+
+  function onKnob2(dir) {  "ram";
+    if (dir) {
+      variant = (variant + dir + 3) % 3;
+      h.clear();
+      setup(variant);
+      Pip.playSound("HIGHLIGHT");
+    } else {
+      h.clear();
+      Pip.playSound("SELECT");
+    }
+  }
+
   return {
+    id: "WARP",
     init: function(v) {
-      variant = v;
-      tick = 0;
-      spawnCooldown = 0;
-      quickSpawns = 0;
-      const currentN = STAR_COUNTS[variant];
-      const minActive = MIN_ACTIVE[variant];
-      
-      // Initialize all stars as inactive (-1) first
-      for (let i = 0; i < MAX_N; i++) {
-        dist[i] = -1;
-      }
-      
-      // Pre-seed up to the minimum required active count so it never starts sparse
-      for (let i = 0; i < minActive; i++) {
-        dist[i] = Math.randInt(250) + 10; // Spread them across various initial depths
-        ang[i] = Math.randInt(628) / 100;
-      }
+      setup(v);
+      Pip.on("knob1", onKnob1);
+      Pip.on("knob2", onKnob2);
     },
     draw: function(h) {  "ram";
       // Shifted speeds: 6 (new slow), 9 (new medium), 12 (new fast)
@@ -122,6 +158,10 @@
         }
       }
       tick++;
+    },
+    remove: function() {
+      Pip.removeListener("knob1", onKnob1);
+      Pip.removeListener("knob2", onKnob2);
     }
   };
 });

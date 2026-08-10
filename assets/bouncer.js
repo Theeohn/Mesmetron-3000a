@@ -1,6 +1,9 @@
 // MESMETRON screensaver module: "bouncer"
 // A single bouncing element that ricochets off all four screen edges.
-// See web.js for the module contract (init/draw) and file-wrapping convention.
+//
+// Owns its own knob1 (rotate + short press) and knob2 (rotate + press)
+// input while active; see web.js for the full module contract
+// (init/draw/remove) and file-wrapping convention.
 
 (function() {
   let variant = 0, tick = 0;
@@ -8,6 +11,7 @@
   let sprite = null, spriteW = 0, spriteH = 0;
   let clearHalfW = 0, clearHalfH = 0;
   let clockStr = "", clockTick = 0;
+  let brightnessStep = 20, lastKnob = 0;
   const rotOpts = { rotate: 0 };
 
   const FILES = ["", "RC.JSON", "ROACH.JSON"];
@@ -28,61 +32,89 @@
     return image;
   }
 
-  return {
-    id: "BOUNCER",
-    remove: function() {},
-    init: function(v) {
-      variant = v;
-      tick = 0;
-      clockTick = 0;
-      sprite = null;
-      
-      // Calculate a random trajectory using Math.randInt to adhere to Espruino constraints.
-      // Keep generating until the angle is strictly NOT within 5 degrees of 
-      // cardinals (0, 90, 180, 270) or diagonals (45, 135, 225, 315).
-      let angleDeg, mod;
-      do {
-        angleDeg = Math.randInt(360);
-        mod = angleDeg % 90;
-      } while (mod <= 5 || mod >= 85 || (mod >= 40 && mod <= 50));
-      
-      // Maintain the original speed magnitude of ~2.76
-      let angleRad = angleDeg * (Math.PI / 180);
-      vx = 2.76 * Math.cos(angleRad);
-      vy = 2.76 * Math.sin(angleRad);
-      
-      if (variant === 0) {
-        clockStr = Pip.currentDateTime()[0];
-        // Measure exact width using the selected font to eliminate the bumper
-        spriteW = h.setFont("Monofonto36").stringWidth(clockStr); 
-        spriteH = 36;
+  function setup(v) {
+    variant = v;
+    tick = 0;
+    clockTick = 0;
+    sprite = null;
+
+    // Calculate a random trajectory using Math.randInt to adhere to Espruino constraints.
+    // Keep generating until the angle is strictly NOT within 5 degrees of 
+    // cardinals (0, 90, 180, 270) or diagonals (45, 135, 225, 315).
+    let angleDeg, mod;
+    do {
+      angleDeg = Math.randInt(360);
+      mod = angleDeg % 90;
+    } while (mod <= 5 || mod >= 85 || (mod >= 40 && mod <= 50));
+
+    let angleRad = angleDeg * (Math.PI / 180);
+    vx = 2.76 * Math.cos(angleRad);
+    vy = 2.76 * Math.sin(angleRad);
+
+    if (variant === 0) {
+      clockStr = Pip.currentDateTime()[0];
+      spriteW = h.setFont("Monofonto36").stringWidth(clockStr); 
+      spriteH = 36;
+      clearHalfW = spriteW / 2; 
+      clearHalfH = spriteH / 2;
+    } else {
+      sprite = loadSprite(FILES[variant]);
+
+      if (variant === 2) {
+        // Calculate the max bounding radius (half-diagonal) for a rotating sprite to prevent trails
+        clearHalfW = clearHalfH = Math.ceil(Math.sqrt((spriteW * spriteW) + (spriteH * spriteH)) / 2);
+      } else {
+        // Non-rotating sprites just use their standard half-width/height
         clearHalfW = spriteW / 2; 
         clearHalfH = spriteH / 2;
-      } else {
-        sprite = loadSprite(FILES[variant]);
-        
-        if (variant === 2) {
-          // Calculate the max bounding radius (half-diagonal) for a rotating sprite to prevent trails
-          clearHalfW = clearHalfH = Math.ceil(Math.sqrt((spriteW * spriteW) + (spriteH * spriteH)) / 2);
-        } else {
-          // Non-rotating sprites just use their standard half-width/height
-          clearHalfW = spriteW / 2; 
-          clearHalfH = spriteH / 2;
-        }
       }
-      
-      // Calculate a 40px bounding margin while accommodating the sprite's dimensions.
-      // Screen dimensions are 480x320. 
-      const halfW = spriteW / 2;
-      const halfH = spriteH / 2;
-      const minX = Math.max(40, halfW) | 0;
-      const maxX = Math.min(440, 480 - halfW) | 0;
-      const minY = Math.max(40, halfH) | 0;
-      const maxY = Math.min(280, 320 - halfH) | 0;
-      
-      // Randomize the starting position within the bounds
-      cx = minX + Math.randInt(maxX - minX + 1);
-      cy = minY + Math.randInt(maxY - minY + 1);
+    }
+
+    // Calculate a 40px bounding margin while accommodating the sprite's dimensions.
+    // Screen dimensions are 480x320. 
+    const halfW = spriteW / 2;
+    const halfH = spriteH / 2;
+    const minX = Math.max(40, halfW) | 0;
+    const maxX = Math.min(440, 480 - halfW) | 0;
+    const minY = Math.max(40, halfH) | 0;
+    const maxY = Math.min(280, 320 - halfH) | 0;
+
+    // Randomize the starting position within the bounds
+    cx = minX + Math.randInt(maxX - minX + 1);
+    cy = minY + Math.randInt(maxY - minY + 1);
+  }
+
+  function onKnob1(dir, long) {  "ram";
+    if (dir) {
+      const now = getTime();
+      if (now - lastKnob < 0.03) return;
+      lastKnob = now;
+      brightnessStep = E.clip(brightnessStep + (dir > 0 ? -1 : 1), 1, 20);
+      Pip.setBrightness(brightnessStep / 20.0);
+      if (Pip.playSound) Pip.playSound("HIGHLIGHT");
+    }
+    // dir === 0 && !long -> short press, reserved for this module. A long
+    // press is handled by the launcher, which returns to the menu.
+  }
+
+  function onKnob2(dir) {  "ram";
+    if (dir) {
+      variant = (variant + dir + 3) % 3;
+      h.clear();
+      setup(variant);
+      Pip.playSound("HIGHLIGHT");
+    } else {
+      h.clear();
+      Pip.playSound("SELECT");
+    }
+  }
+
+  return {
+    id: "BOUNCER",
+    init: function(v) {
+      setup(v);
+      Pip.on("knob1", onKnob1);
+      Pip.on("knob2", onKnob2);
     },
     draw: function(h) {  "ram";
       if (tick > 0) {
@@ -93,12 +125,6 @@
 
       cx += vx; cy += vy;
 
-      // Wall bounce + angle variation, ported from RACE.JS's jitterVelocity():
-      // reflect exactly off the edge, then rotate the resulting velocity vector
-      // by a small random offset (+/-10 degrees) so repeated bounces off the
-      // same wall don't all leave at the identical angle. A rotation can't
-      // change a vector's magnitude, so speed stays locked at ~2.76 forever,
-      // no matter how many times this fires.
       let bounced = false;
       if (cx < spriteW / 2 || cx > 480 - spriteW / 2) { vx = -vx; bounced = true; }
       if (cy < spriteH / 2 || cy > 320 - spriteH / 2) { vy = -vy; bounced = true; }
@@ -133,6 +159,10 @@
         h.drawImage(sprite, (cx - spriteW / 2) | 0, (cy - spriteH / 2) | 0);
       }
       tick++;
+    },
+    remove: function() {
+      Pip.removeListener("knob1", onKnob1);
+      Pip.removeListener("knob2", onKnob2);
     }
   };
 });

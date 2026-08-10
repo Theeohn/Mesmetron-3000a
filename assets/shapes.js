@@ -1,10 +1,15 @@
 // MESMETRON screensaver module: "shapes"
 // A full-screen rotating 3D wireframe shape (Tetrahedron, Cube, or Octahedron)
 // scaled up 40% with geometrically accurate regular shapes.
+//
+// Owns its own knob1 (rotate + short press) and knob2 (rotate + press)
+// input while active; see web.js for the full module contract
+// (init/draw/remove) and file-wrapping convention.
 
 (function() {
   const CX = 240, CY = 160;
   let variant = 0, tick = 0, hasDrawn = false;
+  let brightnessStep = 20, lastKnob = 0;
 
   const SHAPES = [
     // 0: Tetrahedron (Regular 3-sided pyramid using symmetric inscribed cube coordinates)
@@ -54,14 +59,46 @@
     }
   }
 
+  function setup(v) {
+    variant = v;
+    tick = 0;
+    hasDrawn = false;
+    const shape = SHAPES[Math.abs(variant) % SHAPES.length];
+    prevX = new Float32Array(shape.verts.length);
+    prevY = new Float32Array(shape.verts.length);
+  }
+
+  function onKnob1(dir, long) {  "ram";
+    if (dir) {
+      const now = getTime();
+      if (now - lastKnob < 0.03) return;
+      lastKnob = now;
+      brightnessStep = E.clip(brightnessStep + (dir > 0 ? -1 : 1), 1, 20);
+      Pip.setBrightness(brightnessStep / 20.0);
+      if (Pip.playSound) Pip.playSound("HIGHLIGHT");
+    }
+    // dir === 0 && !long -> short press, reserved for this module. A long
+    // press is handled by the launcher, which returns to the menu.
+  }
+
+  function onKnob2(dir) {  "ram";
+    if (dir) {
+      variant = (variant + dir + 3) % 3;
+      h.clear();
+      setup(variant);
+      Pip.playSound("HIGHLIGHT");
+    } else {
+      h.clear();
+      Pip.playSound("SELECT");
+    }
+  }
+
   return {
+    id: "SHAPES",
     init: function(v) {
-      variant = v;
-      tick = 0;
-      hasDrawn = false;
-      const shape = SHAPES[Math.abs(variant) % SHAPES.length];
-      prevX = new Float32Array(shape.verts.length);
-      prevY = new Float32Array(shape.verts.length);
+      setup(v);
+      Pip.on("knob1", onKnob1);
+      Pip.on("knob2", onKnob2);
     },
     draw: function(h) { "ram";
       const shapeIdx = Math.abs(variant) % SHAPES.length;
@@ -125,6 +162,10 @@
       }
       hasDrawn = true;
       tick++;
+    },
+    remove: function() {
+      Pip.removeListener("knob1", onKnob1);
+      Pip.removeListener("knob2", onKnob2);
     }
   };
 });

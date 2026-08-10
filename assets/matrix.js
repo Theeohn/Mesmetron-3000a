@@ -1,11 +1,16 @@
 // MESMETRON screensaver module: "matrix"
 // Code-rain columns with autonomous, independent column spawning.
+//
+// Owns its own knob1 (rotate + short press) and knob2 (rotate + press)
+// input while active; see web.js for the full module contract
+// (init/draw/remove) and file-wrapping convention.
 
 (function() {
   const MCOLS = 48, MCHARS = 6;
   const CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~";
 
   let variant = 0, needsSetup = 1;
+  let brightnessStep = 20, lastKnob = 0;
   const mHead = new Int16Array(MCOLS);
   const mSpd = new Uint8Array(MCOLS);
   const mColChars = new Uint8Array(MCOLS * MCHARS);
@@ -20,10 +25,42 @@
     for (let k = 0; k < MCHARS; k++) mColChars[c * MCHARS + k] = Math.randInt(CHARSET.length);
   }
 
+  function setup(v) {
+    variant = v;
+    needsSetup = 1;
+  }
+
+  function onKnob1(dir, long) {  "ram";
+    if (dir) {
+      const now = getTime();
+      if (now - lastKnob < 0.03) return;
+      lastKnob = now;
+      brightnessStep = E.clip(brightnessStep + (dir > 0 ? -1 : 1), 1, 20);
+      Pip.setBrightness(brightnessStep / 20.0);
+      if (Pip.playSound) Pip.playSound("HIGHLIGHT");
+    }
+    // dir === 0 && !long -> short press, reserved for this module. A long
+    // press is handled by the launcher, which returns to the menu.
+  }
+
+  function onKnob2(dir) {  "ram";
+    if (dir) {
+      variant = (variant + dir + 3) % 3;
+      h.clear();
+      setup(variant);
+      Pip.playSound("HIGHLIGHT");
+    } else {
+      h.clear();
+      Pip.playSound("SELECT");
+    }
+  }
+
   return {
+    id: "MATRIX",
     init: function(v) {
-      variant = v;
-      needsSetup = 1;
+      setup(v);
+      Pip.on("knob1", onKnob1);
+      Pip.on("knob2", onKnob2);
     },
     draw: function(h) {  "ram";
       if (needsSetup) {
@@ -88,6 +125,10 @@
           mHead[c] = -1;
         }
       }
+    },
+    remove: function() {
+      Pip.removeListener("knob1", onKnob1);
+      Pip.removeListener("knob2", onKnob2);
     }
   };
 });
