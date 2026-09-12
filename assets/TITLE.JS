@@ -19,7 +19,7 @@
   const ITEMS = [
     { name: "BOUNCER", file: "bouncer.js" },
     { name: "FIREWORKS", file: "fireworks.js" },
-    { name: "KALEIDOSCOPE", file: "kaleidoscope.js" },
+    { name: "BURST", file: "burst.js" },
     { name: "MATRIX", file: "matrix.js" },
     { name: "RIBBON", file: "ribbon.js" },
     { name: "SPIRAL", file: "spiral.js" },
@@ -28,8 +28,18 @@
     { name: "WARP", file: "warp.js" },
     { name: "WEB", file: "web.js" }
   ];
-  const BX1 = 90, BY1 = 152, BX2 = 390, BY2 = 294;
-  const ROWY0 = 177, ROWH = 30;
+  const BX1 = 90, BY1 = 138, BX2 = 390, BY2 = 280;
+  const ROWY0 = 163, ROWH = 30;
+  // Footer hint box - same width as the list box, sitting just below it.
+  // Drawn once from repaint(), never touched by move()/scroll, so it can't
+  // be scrolled to or selected.
+  const HY1 = BY2 + 1, HY2 = 316;
+  // Wrapped once here (wrapping is expensive - see the text wrapping rule)
+  // rather than re-wrapping on every repaint. Line pitch is measured off the
+  // actual rendered glyph height (plus a couple px of breathing room) so the
+  // lines can't overlap no matter what the real font metrics turn out to be.
+  const HINT = h.setFont("Monofonto14").wrapString("HOLD LEFT WHEEL TO RETURN TO THIS MENU, SCROLL RIGHT WHEEL FOR VARIANTS", BX2 - BX1 - 20);
+  const LINEH = h.stringMetrics(HINT[0]).height + 1;
   let selected = 0;
   let scroll = 0;
 
@@ -50,6 +60,16 @@
     h.setColor(3);
     h.drawRect(BX1, BY1, BX2, BY2);
     h.drawRect(BX1 + 1, BY1 + 1, BX2 - 1, BY2 - 1);
+  }
+
+  function drawHint() {
+    h.setColor(0).fillRect(BX1 + 2, HY1 + 2, BX2 - 2, HY2 - 2);
+    h.setColor(2);
+    h.drawRect(BX1, HY1, BX2, HY2);
+    h.drawRect(BX1 + 1, HY1 + 1, BX2 - 1, HY2 - 1);
+    h.setFont("Monofonto14").setFontAlign(0, 0);
+    const y0 = (HY1 + HY2) / 2 - LINEH * (HINT.length - 1) / 2 + 3;
+    for (let i = 0; i < HINT.length; i++) h.drawString(HINT[i], 240, y0 + i * LINEH);
   }
 
   function drawList() {
@@ -103,6 +123,7 @@
     repaint: function() {
       drawBackground();
       drawBorder();
+      drawHint();
     },
     init: function(startIndex) {
       selected = E.clip(startIndex || 0, 0, ITEMS.length - 1);

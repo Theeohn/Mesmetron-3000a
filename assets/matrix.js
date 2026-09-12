@@ -72,7 +72,7 @@
         cellW = 480 / baseCols;
         stepW = cellW / 2;
         mRows = Math.ceil(320 / cellH);
-        const baseSpd = variant === 0 ? 12 : (variant === 1 ? 9 : 6);
+        const baseSpd = variant === 0 ? 10 : (variant === 1 ? 7 : 5);
         mTrail = 8;
         mMid = 4;
         for (let c = 0; c < mCols; c++) {
@@ -87,7 +87,7 @@
         needsSetup = 0;
       }
 
-      const baseSpd = variant === 0 ? 12 : (variant === 1 ? 9 : 6);
+      const baseSpd = variant === 0 ? 10 : (variant === 1 ? 7 : 5);
       h.setFont("Monofonto23").setFontAlign(-1, -1);
       for (let c = 0; c < mCols; c++) {
         if (mHead[c] < 0) {
