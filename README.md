@@ -1,6 +1,6 @@
 # Mesmetron
 
-Screensavers of all kinds, rendered locally, no videos.
+Screensavers of all kinds rendered locally, no videos. Modular so you can make and add your own!
 
 ## Controls
 
